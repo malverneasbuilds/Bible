@@ -15,15 +15,6 @@ export default function BibleScreen() {
   const [selectedBook, setSelectedBook] = useState<string>('');
   const [selectedChapter, setSelectedChapter] = useState<number>(1);
 
-  // Auto-navigate to last reading position if available
-  React.useEffect(() => {
-    if (lastReadingPosition && mode === 'books') {
-      setSelectedBook(lastReadingPosition.bookId);
-      setSelectedChapter(lastReadingPosition.chapter);
-      setMode('reader');
-    }
-  }, [lastReadingPosition, mode]);
-
   const handleBookSelect = (bookId: string) => {
     setSelectedBook(bookId);
     setMode('chapters');
