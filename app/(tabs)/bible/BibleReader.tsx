@@ -35,13 +35,16 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
   const book = books.find(b => b.id === bookId);
 
   useEffect(() => {
-    const chapterVerses = getVersesByChapter(bookId, chapter);
-    setVerses(chapterVerses);
-    
-    // Update reading progress
-    if (chapterVerses.length > 0) {
-      updateReadingProgress(bookId, chapter);
-    }
+    const loadChapter = async () => {
+      const chapterVerses = await getVersesByChapter(bookId, chapter);
+      setVerses(chapterVerses);
+
+      if (chapterVerses.length > 0) {
+        updateReadingProgress(bookId, chapter);
+      }
+    };
+
+    loadChapter();
   }, [bookId, chapter]);
 
   const handleVersePress = (verse: Verse) => {

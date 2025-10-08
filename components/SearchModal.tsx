@@ -29,12 +29,18 @@ export function SearchModal({ visible, onClose, onVerseSelect }: SearchModalProp
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
-    const searchTimeout = setTimeout(() => {
+    const searchTimeout = setTimeout(async () => {
       if (searchQuery.trim().length > 2) {
         setIsSearching(true);
-        const results = searchVerses(searchQuery.trim());
-        setSearchResults(results);
-        setIsSearching(false);
+        try {
+          const results = await searchVerses(searchQuery.trim());
+          setSearchResults(results);
+        } catch (error) {
+          console.error('Search error:', error);
+          setSearchResults([]);
+        } finally {
+          setIsSearching(false);
+        }
       } else {
         setSearchResults([]);
       }
