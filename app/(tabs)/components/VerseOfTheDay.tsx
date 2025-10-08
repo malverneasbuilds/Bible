@@ -1,0 +1,117 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { MessageCircle, Share, Heart } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useBible } from '@/hooks/useBible';
+import { useTheme } from '@/hooks/useTheme';
+import { AIChatModal } from '@/components/AIChatModal';
+
+export function VerseOfTheDay() {
+  const { colors } = useTheme();
+  const { getVerseOfTheDay, saveVerse } = useBible();
+  const [showAIChat, setShowAIChat] = useState(false);
+  
+  const verseOfTheDay = getVerseOfTheDay();
+
+  const handleSaveVerse = async () => {
+    await saveVerse(verseOfTheDay);
+  };
+
+  return (
+    <>
+      <View style={[styles.container, { borderColor: colors.border }]}>
+        <LinearGradient
+          colors={[colors.primary + '10', 'transparent']}
+          style={styles.gradient}>
+          <Text style={[styles.title, { color: colors.primary }]}>
+            Verse of the Day
+          </Text>
+          
+          <Text style={[styles.verse, { color: colors.text }]}>
+            "{verseOfTheDay.text}"
+          </Text>
+          
+          <Text style={[styles.reference, { color: colors.textSecondary }]}>
+            {verseOfTheDay.book.charAt(0).toUpperCase() + verseOfTheDay.book.slice(1)} {verseOfTheDay.chapter}:{verseOfTheDay.verse}
+          </Text>
+
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+              onPress={() => setShowAIChat(true)}>
+              <MessageCircle size={18} color="white" />
+              <Text style={styles.actionButtonText}>Dive Deeper</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={handleSaveVerse}>
+              <Heart size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </View>
+
+      <AIChatModal
+        visible={showAIChat}
+        verse={verseOfTheDay}
+        onClose={() => setShowAIChat(false)}
+      />
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 24,
+    borderWidth: 1,
+  },
+  gradient: {
+    padding: 20,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  verse: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  reference: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 20,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flex: 1,
+    justifyContent: 'center',
+    gap: 8,
+  },
+  actionButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+});
