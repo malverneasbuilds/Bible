@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { ChevronLeft, ChevronDown, Play, Pause, Search } from 'lucide-react-native';
+import { ChevronLeft, ChevronDown, Volume2, Search } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useBible } from '@/hooks/useBible';
 import { useTheme } from '@/hooks/useTheme';
-import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import { Verse } from '@/types/bible';
 import { VerseActions } from './components/VerseActions';
 import { AIChatModal } from '@/components/AIChatModal';
 import { BookSelectionModal } from '@/components/BookSelectionModal';
 import { ChapterSelectionModal } from '@/components/ChapterSelectionModal';
 import { SearchModal } from '@/components/SearchModal';
+import { AudioPlayerControls } from '@/components/AudioPlayerControls';
 
 interface BibleReaderProps {
   bookId: string;
@@ -23,7 +23,6 @@ interface BibleReaderProps {
 export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterChange }: BibleReaderProps) {
   const { colors } = useTheme();
   const { books, getVersesByChapter, updateReadingProgress, isVerseHighlighted } = useBible();
-  const { isPlaying, speak } = useTextToSpeech();
   const [verses, setVerses] = useState<Verse[]>([]);
   const [selectedVerse, setSelectedVerse] = useState<Verse | null>(null);
   const [showActions, setShowActions] = useState(false);
@@ -31,6 +30,7 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
   const [showBookSelection, setShowBookSelection] = useState(false);
   const [showChapterSelection, setShowChapterSelection] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showAudioPlayer, setShowAudioPlayer] = useState(false);
 
   const book = books.find(b => b.id === bookId);
 
@@ -50,8 +50,7 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
   };
 
   const handleReadAloud = () => {
-    const chapterText = verses.map(v => v.text).join(' ');
-    speak(chapterText);
+    setShowAudioPlayer(true);
   };
 
   const handleTalkToAI = () => {
@@ -118,11 +117,7 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.primary }]}
             onPress={handleReadAloud}>
-            {isPlaying ? (
-              <Pause size={20} color="white" />
-            ) : (
-              <Play size={20} color="white" />
-            )}
+            <Volume2 size={20} color="white" />
           </TouchableOpacity>
         </View>
 
@@ -191,6 +186,13 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
         visible={showSearch}
         onClose={() => setShowSearch(false)}
         onVerseSelect={handleVerseFromSearch}
+      />
+
+      <AudioPlayerControls
+        visible={showAudioPlayer}
+        onClose={() => setShowAudioPlayer(false)}
+        text={verses.map(v => v.text).join(' ')}
+        title={`${book.name} ${chapter}`}
       />
     </>
   );

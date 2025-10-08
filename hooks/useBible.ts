@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BIBLE_BOOKS, SAMPLE_VERSES, VERSES_OF_THE_DAY } from '../data/bible';
+import { BIBLE_BOOKS, SAMPLE_VERSES, VERSES_OF_THE_DAY, generatePlaceholderVerses } from '../data/bible';
 import { Book, Verse, Chapter, SavedVerse, UserProgress, UserStreaks } from '../types/bible';
 
 const STORAGE_KEYS = {
@@ -54,7 +54,10 @@ export function useBible() {
   };
 
   const getVersesByChapter = (bookId: string, chapter: number): Verse[] => {
-    return SAMPLE_VERSES[bookId]?.[chapter] || [];
+    if (SAMPLE_VERSES[bookId]?.[chapter]) {
+      return SAMPLE_VERSES[bookId][chapter];
+    }
+    return generatePlaceholderVerses(bookId, chapter, 25);
   };
 
   const getVerseOfTheDay = (): Verse => {
