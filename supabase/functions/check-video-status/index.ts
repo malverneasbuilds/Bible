@@ -1,5 +1,4 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { GoogleGenAI } from 'npm:@google/generative-ai@0.21.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -51,6 +50,7 @@ Deno.serve(async (req: Request) => {
       const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
       if (googleApiKey) {
         try {
+          const { GoogleGenAI } = await import('npm:@google/generative-ai@0.21.0');
           const ai = new GoogleGenAI({ apiKey: googleApiKey });
 
           // Check operation status

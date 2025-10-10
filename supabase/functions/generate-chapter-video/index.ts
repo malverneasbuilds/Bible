@@ -1,5 +1,4 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { GoogleGenAI } from 'npm:@google/generative-ai@0.21.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -132,32 +131,58 @@ Generate a cinematic video prompt (max 500 characters) that captures the essence
     const scriptData = await scriptResponse.json();
     const script = scriptData.choices[0].message.content;
 
-    // Initialize Google GenAI with API key
+    // Try to initialize Google GenAI for video generation
     const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
-    if (!googleApiKey) {
-      throw new Error('Google API key not configured');
+
+    let videoRecord;
+
+    if (googleApiKey) {
+      try {
+        // Dynamically import the Google GenAI package
+        const { GoogleGenAI } = await import('npm:@google/generative-ai@0.21.0');
+        const ai = new GoogleGenAI({ apiKey: googleApiKey });
+
+        // Start video generation
+        const operation = await ai.models.generateVideos({
+          model: 'veo-3.0-generate-001',
+          prompt: script,
+        });
+
+        videoRecord = {
+          book_number: bookNumber,
+          chapter: chapter,
+          script: script,
+          status: 'generating' as const,
+          veo_task_id: operation.name,
+          video_url: null,
+          duration_seconds: 10,
+          error_message: null,
+        };
+      } catch (veoError) {
+        console.error('Veo generation error:', veoError);
+        videoRecord = {
+          book_number: bookNumber,
+          chapter: chapter,
+          script: script,
+          status: 'failed' as const,
+          veo_task_id: null,
+          video_url: null,
+          duration_seconds: 10,
+          error_message: `Video generation unavailable: ${veoError.message || 'Unable to access Google Veo API'}`,
+        };
+      }
+    } else {
+      videoRecord = {
+        book_number: bookNumber,
+        chapter: chapter,
+        script: script,
+        status: 'failed' as const,
+        veo_task_id: null,
+        video_url: null,
+        duration_seconds: 10,
+        error_message: 'Google API key not configured. Video generation requires a valid GOOGLE_API_KEY environment variable.',
+      };
     }
-
-    const ai = new GoogleGenAI({ apiKey: googleApiKey });
-
-    // Start video generation
-    let operation = await ai.models.generateVideos({
-      model: 'veo-3.0-generate-001',
-      prompt: script,
-    });
-
-    // Since video generation takes time, we'll save the operation ID
-    // and mark it as 'generating'. A separate function will poll for completion.
-    const videoRecord = {
-      book_number: bookNumber,
-      chapter: chapter,
-      script: script,
-      status: 'generating' as const,
-      veo_task_id: operation.name,
-      video_url: null,
-      duration_seconds: 10,
-      error_message: null,
-    };
 
     const { data: savedVideo, error: saveError } = await supabase
       .from('chapter_videos')
