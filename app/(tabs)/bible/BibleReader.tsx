@@ -88,13 +88,10 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
   };
 
   const handleWatchStory = async () => {
-    if (video?.status === 'completed' && video?.video_url) {
-      setShowVideoPlayer(true);
-    } else if (!video || video.status === 'failed') {
-      await generateVideo();
-      setShowVideoPlayer(true);
-    } else if (video.status === 'generating') {
-      setShowVideoPlayer(true);
+    setShowVideoPlayer(true);
+
+    if (!video || video.status === 'failed') {
+      generateVideo();
     }
   };
 
@@ -157,26 +154,23 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
               </Text>
             </View>
           ) : (
-            verses.map((verse) => (
-              <TouchableOpacity
-                key={verse.id}
-                style={[
-                  styles.verse,
-                  { 
-                    backgroundColor: isVerseHighlighted(verse) ? colors.warning + '20' : 
-                                   selectedVerse?.id === verse.id ? colors.primary + '10' : 'transparent',
-                    borderLeftColor: isVerseHighlighted(verse) ? colors.warning : 'transparent',
-                  }
-                ]}
-                onPress={() => handleVersePress(verse)}>
-                <Text style={[styles.verseNumber, { color: colors.textSecondary }]}>
-                  {verse.verse}
-                </Text>
-                <Text style={[styles.verseText, { color: colors.text }]}>
-                  {verse.text}
-                </Text>
-              </TouchableOpacity>
-            ))
+            <View style={styles.continuousText}>
+              <Text style={[styles.chapterText, { color: colors.text }]}>
+                {verses.map((verse, index) => (
+                  <Text key={verse.id}>
+                    <Text
+                      style={[styles.inlineVerseNumber, { color: colors.textSecondary }]}
+                      onPress={() => handleVersePress(verse)}>
+                      {verse.verse}
+                    </Text>
+                    <Text style={[styles.verseTextInline, { color: colors.text }]}>
+                      {verse.text}
+                      {index < verses.length - 1 ? ' ' : ''}
+                    </Text>
+                  </Text>
+                ))}
+              </Text>
+            </View>
           )}
         </ScrollView>
       </View>
@@ -287,6 +281,24 @@ const styles = StyleSheet.create({
   },
   verses: {
     padding: 20,
+  },
+  continuousText: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  chapterText: {
+    fontSize: 17,
+    lineHeight: 28,
+  },
+  inlineVerseNumber: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginRight: 4,
+    marginLeft: 6,
+  },
+  verseTextInline: {
+    fontSize: 17,
+    lineHeight: 28,
   },
   verse: {
     flexDirection: 'row',

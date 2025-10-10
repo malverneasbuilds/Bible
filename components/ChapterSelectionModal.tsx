@@ -96,6 +96,7 @@ export function ChapterSelectionModal({ visible, bookId, onClose, onChapterSelec
             spacing={12}
             renderItem={renderChapter}
             contentContainerStyle={styles.gridContent}
+            fixed
           />
         </View>
       </BlurView>
@@ -146,6 +147,7 @@ const styles = StyleSheet.create({
   },
   gridContent: {
     padding: 20,
+    paddingBottom: 40,
   },
   chapterItem: {
     height: 60,

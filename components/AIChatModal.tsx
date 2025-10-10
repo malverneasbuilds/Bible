@@ -1,58 +1,49 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  Modal, 
-  TextInput, 
-  TouchableOpacity, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Alert
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { X, Send, Save, Bot, User } from 'lucide-react-native';
+import Constants from 'expo-constants';
 import { useTheme } from '@/hooks/useTheme';
-import { useAI } from '@/hooks/useAI';
-import { Verse, ChatMessage, SavedChat } from '@/types/bible';
+import { Verse, ChatMessage } from '@/types/bible';
 
 interface AIChatModalProps {
   visible: boolean;
   verse?: Verse | null;
+  chatId?: string | null;
+  existingMessages?: ChatMessage[];
   onClose: () => void;
+  onChatSaved?: (chatId: string) => void;
 }
 
-export function AIChatModal({ visible, verse, onClose }: AIChatModalProps) {
+export function AIChatModal({ visible, verse, chatId: initialChatId, existingMessages, onClose, onChatSaved }: AIChatModalProps) {
   const { colors } = useTheme();
-  const { generateAIResponse, saveChat, isLoading } = useAI();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(existingMessages || []);
   const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [chatId, setChatId] = useState<string | null>(initialChatId || null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const supabaseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
 
   useEffect(() => {
-    if (visible && verse && messages.length === 0) {
-      // Initialize conversation with verse context
-      const initialMessage: ChatMessage = {
-        id: Date.now().toString(),
-        text: `I'd like to discuss this verse: "${verse.text}" - ${verse.book} ${verse.chapter}:${verse.verse}`,
-        isUser: true,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages([initialMessage]);
-      
-      // Generate initial AI response
-      generateAIResponse(initialMessage.text, verse).then((response) => {
-        const aiMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          text: response,
-          isUser: false,
-          timestamp: new Date().toISOString(),
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      });
+    if (visible && existingMessages && existingMessages.length > 0) {
+      setMessages(existingMessages);
+      setChatId(initialChatId || null);
+    } else if (visible && !existingMessages) {
+      setMessages([]);
+      setChatId(null);
     }
-  }, [visible, verse]);
+  }, [visible, existingMessages, initialChatId]);
 
   useEffect(() => {
     // Scroll to bottom when new messages are added
@@ -64,50 +55,83 @@ export function AIChatModal({ visible, verse, onClose }: AIChatModalProps) {
   const handleSendMessage = async () => {
     if (!inputText.trim() || isLoading) return;
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      text: inputText.trim(),
-      isUser: true,
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+    const messageText = inputText.trim();
     setInputText('');
+    setIsLoading(true);
 
     try {
-      const response = await generateAIResponse(userMessage.text, verse);
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        text: response,
-        isUser: false,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, aiMessage]);
+      const apiMessages = messages.map(m => ({
+        role: m.isUser ? 'user' : 'assistant',
+        content: m.text,
+      }));
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/ai-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: messageText,
+          verse: verse ? {
+            book: verse.book,
+            chapter: verse.chapter,
+            verse: verse.verse,
+            text: verse.text,
+          } : null,
+          chatId,
+          messages: apiMessages,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        const userMessage: ChatMessage = {
+          id: Date.now().toString(),
+          text: messageText,
+          isUser: true,
+          timestamp: new Date().toISOString(),
+        };
+
+        const aiMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          text: data.message,
+          isUser: false,
+          timestamp: new Date().toISOString(),
+        };
+
+        setMessages(prev => [...prev, userMessage, aiMessage]);
+
+        if (data.chatId && !chatId) {
+          setChatId(data.chatId);
+          onChatSaved?.(data.chatId);
+        }
+      } else {
+        Alert.alert('Error', data.error || 'Failed to get AI response');
+      }
     } catch (error) {
       console.error('Error generating AI response:', error);
+      Alert.alert('Error', 'Failed to connect to AI service');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSaveChat = () => {
-    if (messages.length === 0) {
-      Alert.alert('Nothing to Save', 'Start a conversation first before saving.');
-      return;
+    if (chatId) {
+      Alert.alert('Chat Saved', 'Your conversation is automatically saved.');
+    } else if (messages.length === 0) {
+      Alert.alert('Nothing to Save', 'Start a conversation first.');
+    } else {
+      Alert.alert('Auto-Save', 'Your chat will be saved automatically when you send your first message.');
     }
-
-    const chat: SavedChat = {
-      id: Date.now().toString(),
-      title: verse ? `Discussion: ${verse.book} ${verse.chapter}:${verse.verse}` : 'Bible Discussion',
-      verse: verse || undefined,
-      messages,
-      savedAt: new Date().toISOString(),
-    };
-
-    saveChat(chat);
-    Alert.alert('Chat Saved', 'Your conversation has been saved successfully.');
   };
 
   const handleClose = () => {
-    setMessages([]);
+    if (!existingMessages) {
+      setMessages([]);
+      setChatId(null);
+    }
     setInputText('');
     onClose();
   };

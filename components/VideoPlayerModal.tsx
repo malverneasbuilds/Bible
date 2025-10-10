@@ -56,17 +56,17 @@ export function VideoPlayerModal({
           </View>
 
           <View style={styles.content}>
-            {isGenerating ? (
+            {isGenerating || !videoUrl ? (
               <View style={styles.generatingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={[styles.generatingText, { color: colors.text }]}>
-                  Generating video...
+                  {isGenerating ? 'Generating video...' : 'Preparing video...'}
                 </Text>
                 <Text style={[styles.generatingSubtext, { color: colors.textSecondary }]}>
-                  This may take 2-3 minutes. Please wait.
+                  This may take 2-3 minutes. Please check back shortly.
                 </Text>
               </View>
-            ) : videoUrl ? (
+            ) : (
               <View style={styles.videoContainer}>
                 {Platform.OS === 'web' ? (
                   <video
@@ -110,12 +110,6 @@ export function VideoPlayerModal({
                     </View>
                   </>
                 )}
-              </View>
-            ) : (
-              <View style={styles.errorContainer}>
-                <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-                  No video available
-                </Text>
               </View>
             )}
           </View>
