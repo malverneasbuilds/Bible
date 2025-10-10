@@ -46,17 +46,22 @@ export function useChapterVideo(bookNumber: number, chapter: number) {
   };
 
   const generateVideo = async () => {
+    console.log('🎬 [CLIENT] Starting video generation...');
+    console.log('🎬 [CLIENT] Book:', bookNumber, 'Chapter:', chapter);
     setIsLoading(true);
     setError(null);
 
     try {
       if (!supabaseUrl) {
+        console.error('❌ [CLIENT] Supabase URL not configured');
         throw new Error('Supabase URL not configured');
       }
 
       const url = `${supabaseUrl}/functions/v1/generate-chapter-video`;
-      console.log('Generating video:', { url, bookNumber, chapter });
+      console.log('📡 [CLIENT] Edge Function URL:', url);
+      console.log('📡 [CLIENT] Request payload:', { bookNumber, chapter });
 
+      console.log('📡 [CLIENT] Sending request to Edge Function...');
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -70,23 +75,31 @@ export function useChapterVideo(bookNumber: number, chapter: number) {
         }),
       });
 
-      console.log('Video generation response status:', response.status);
+      console.log('✅ [CLIENT] Response received. Status:', response.status);
+      console.log('✅ [CLIENT] Response OK:', response.ok);
+
       const data = await response.json();
-      console.log('Video generation response data:', data);
+      console.log('📦 [CLIENT] Response data:', data);
 
       if (!data.success) {
+        console.error('❌ [CLIENT] Request failed:', data.error);
         throw new Error(data.error || 'Failed to generate video');
       }
 
       if (data.cached) {
         setVideo(data.video);
-        console.log('Video loaded from cache');
+        console.log('💾 [CLIENT] Video loaded from cache');
       } else {
         setVideo(data.video);
-        console.log('Video generation started, status:', data.video.status);
+        console.log('🎥 [CLIENT] Video generation started, status:', data.video.status);
 
         if (data.video.status === 'generating') {
+          console.log('⏳ [CLIENT] Starting to poll for video completion...');
           startPolling();
+        } else if (data.video.status === 'failed') {
+          console.warn('⚠️ [CLIENT] Video generation failed:', data.video.error_message);
+        } else if (data.video.status === 'completed') {
+          console.log('✅ [CLIENT] Video is ready!');
         }
       }
 
@@ -94,14 +107,17 @@ export function useChapterVideo(bookNumber: number, chapter: number) {
     } catch (err: any) {
       const errorMsg = err.message || 'Failed to generate video';
       setError(errorMsg);
-      console.error('Error generating video:', err);
+      console.error('❌ [CLIENT] FATAL ERROR:', err);
+      console.error('❌ [CLIENT] Error details:', err.stack);
       return null;
     } finally {
+      console.log('🏁 [CLIENT] generateVideo completed');
       setIsLoading(false);
     }
   };
 
   const pollVideoStatus = async () => {
+    console.log('🔄 [CLIENT] Polling video status...');
     try {
       const response = await fetch(
         `${supabaseUrl}/functions/v1/check-video-status?bookNumber=${bookNumber}&chapter=${chapter}`,
@@ -113,19 +129,23 @@ export function useChapterVideo(bookNumber: number, chapter: number) {
         }
       );
 
+      console.log('✅ [CLIENT] Poll response status:', response.status);
       const data = await response.json();
+      console.log('📦 [CLIENT] Poll response data:', data);
 
       if (data.success && data.video) {
         setVideo(data.video);
+        console.log('🎥 [CLIENT] Video status:', data.video.status);
 
         if (data.video.status === 'completed' || data.video.status === 'failed') {
+          console.log('✅ [CLIENT] Video finished. Status:', data.video.status);
           return true;
         }
       }
 
       return false;
     } catch (err) {
-      console.error('Error polling video status:', err);
+      console.error('❌ [CLIENT] Error polling video status:', err);
       return false;
     }
   };
@@ -144,12 +164,19 @@ export function useChapterVideo(bookNumber: number, chapter: number) {
   };
 
   const loadExistingVideo = async () => {
+    console.log('🔍 [CLIENT] Loading existing video...');
     setIsLoading(true);
     const existingVideo = await checkVideoStatus();
+    if (existingVideo) {
+      console.log('📼 [CLIENT] Found existing video:', existingVideo.status);
+    } else {
+      console.log('ℹ️ [CLIENT] No existing video found');
+    }
     setVideo(existingVideo);
     setIsLoading(false);
 
     if (existingVideo?.status === 'generating') {
+      console.log('⏳ [CLIENT] Video is generating, starting poll...');
       startPolling();
     }
   };
