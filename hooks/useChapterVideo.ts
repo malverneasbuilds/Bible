@@ -22,6 +22,7 @@ export function useChapterVideo(bookNumber: number, chapter: number) {
   const [error, setError] = useState<string | null>(null);
 
   const supabaseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
   const checkVideoStatus = async () => {
     try {
@@ -60,6 +61,8 @@ export function useChapterVideo(bookNumber: number, chapter: number) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey': supabaseAnonKey,
         },
         body: JSON.stringify({
           bookNumber,
@@ -101,7 +104,13 @@ export function useChapterVideo(bookNumber: number, chapter: number) {
   const pollVideoStatus = async () => {
     try {
       const response = await fetch(
-        `${supabaseUrl}/functions/v1/check-video-status?bookNumber=${bookNumber}&chapter=${chapter}`
+        `${supabaseUrl}/functions/v1/check-video-status?bookNumber=${bookNumber}&chapter=${chapter}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'apikey': supabaseAnonKey,
+          },
+        }
       );
 
       const data = await response.json();

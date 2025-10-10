@@ -35,6 +35,7 @@ export function AIChatModal({ visible, verse, chatId: initialChatId, existingMes
   const [chatId, setChatId] = useState<string | null>(initialChatId || null);
   const scrollViewRef = useRef<ScrollView>(null);
   const supabaseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
   useEffect(() => {
     if (visible && existingMessages && existingMessages.length > 0) {
@@ -87,6 +88,8 @@ export function AIChatModal({ visible, verse, chatId: initialChatId, existingMes
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey': supabaseAnonKey,
         },
         body: JSON.stringify({
           message: messageText,
