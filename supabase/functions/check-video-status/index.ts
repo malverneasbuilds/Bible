@@ -48,6 +48,7 @@ Deno.serve(async (req: Request) => {
 
     if (video.status === 'generating' && video.veo_task_id) {
       const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
+      console.log('Here is the code to test')
       if (googleApiKey) {
        console.log('Now generating the video')
         try {
