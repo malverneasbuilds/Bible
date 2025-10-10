@@ -18,6 +18,7 @@ interface VideoPlayerModalProps {
   videoUrl: string | null;
   chapterTitle: string;
   isGenerating: boolean;
+  error?: string | null;
   onClose: () => void;
 }
 
@@ -26,6 +27,7 @@ export function VideoPlayerModal({
   videoUrl,
   chapterTitle,
   isGenerating,
+  error,
   onClose,
 }: VideoPlayerModalProps) {
   const { colors } = useTheme();
@@ -56,7 +58,15 @@ export function VideoPlayerModal({
           </View>
 
           <View style={styles.content}>
-            {isGenerating || !videoUrl ? (
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Text style={[styles.errorTitle, { color: colors.error }]}>Error</Text>
+                <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
+                <Text style={[styles.errorHint, { color: colors.textSecondary }]}>
+                  Check console for more details
+                </Text>
+              </View>
+            ) : isGenerating || !videoUrl ? (
               <View style={styles.generatingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={[styles.generatingText, { color: colors.text }]}>
@@ -213,9 +223,22 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     paddingVertical: 60,
+    paddingHorizontal: 32,
     alignItems: 'center',
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 16,
   },
   errorText: {
     fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  errorHint: {
+    fontSize: 14,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });

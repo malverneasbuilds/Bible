@@ -37,7 +37,7 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
 
   const book = books.find(b => b.id === bookId);
   const bookNumber = book ? books.indexOf(book) + 1 : 0;
-  const { video, isLoading: videoLoading, generateVideo } = useChapterVideo(bookNumber, chapter);
+  const { video, isLoading: videoLoading, error: videoError, generateVideo } = useChapterVideo(bookNumber, chapter);
 
   useEffect(() => {
     const loadChapter = async () => {
@@ -219,6 +219,7 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
         videoUrl={video?.video_url || null}
         chapterTitle={`${book.name} ${chapter}`}
         isGenerating={video?.status === 'generating'}
+        error={videoError || video?.error_message}
         onClose={() => setShowVideoPlayer(false)}
       />
     </>

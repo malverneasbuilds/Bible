@@ -31,6 +31,7 @@ export function AIChatModal({ visible, verse, chatId: initialChatId, existingMes
   const [messages, setMessages] = useState<ChatMessage[]>(existingMessages || []);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [chatId, setChatId] = useState<string | null>(initialChatId || null);
   const scrollViewRef = useRef<ScrollView>(null);
   const supabaseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -58,12 +59,29 @@ export function AIChatModal({ visible, verse, chatId: initialChatId, existingMes
     const messageText = inputText.trim();
     setInputText('');
     setIsLoading(true);
+    setError(null);
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      text: messageText,
+      isUser: true,
+      timestamp: new Date().toISOString(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
 
     try {
+      if (!supabaseUrl) {
+        throw new Error('Supabase URL not configured');
+      }
+
       const apiMessages = messages.map(m => ({
         role: m.isUser ? 'user' : 'assistant',
         content: m.text,
       }));
+
+      console.log('Sending to:', `${supabaseUrl}/functions/v1/ai-chat`);
+      console.log('Payload:', { message: messageText, verse, chatId, messagesCount: apiMessages.length });
 
       const response = await fetch(`${supabaseUrl}/functions/v1/ai-chat`, {
         method: 'POST',
@@ -83,16 +101,11 @@ export function AIChatModal({ visible, verse, chatId: initialChatId, existingMes
         }),
       });
 
+      console.log('Response status:', response.status);
       const data = await response.json();
+      console.log('Response data:', data);
 
       if (data.success) {
-        const userMessage: ChatMessage = {
-          id: Date.now().toString(),
-          text: messageText,
-          isUser: true,
-          timestamp: new Date().toISOString(),
-        };
-
         const aiMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           text: data.message,
@@ -100,18 +113,21 @@ export function AIChatModal({ visible, verse, chatId: initialChatId, existingMes
           timestamp: new Date().toISOString(),
         };
 
-        setMessages(prev => [...prev, userMessage, aiMessage]);
+        setMessages(prev => [...prev, aiMessage]);
 
         if (data.chatId && !chatId) {
           setChatId(data.chatId);
           onChatSaved?.(data.chatId);
         }
       } else {
-        Alert.alert('Error', data.error || 'Failed to get AI response');
+        const errorMsg = data.error || 'Failed to get AI response';
+        setError(errorMsg);
+        console.error('API Error:', errorMsg);
       }
-    } catch (error) {
+    } catch (error: any) {
+      const errorMsg = error.message || 'Failed to connect to AI service';
+      setError(errorMsg);
       console.error('Error generating AI response:', error);
-      Alert.alert('Error', 'Failed to connect to AI service');
     } finally {
       setIsLoading(false);
     }
@@ -244,6 +260,16 @@ export function AIChatModal({ visible, verse, chatId: initialChatId, existingMes
                       Thinking...
                     </Text>
                   </View>
+                </View>
+              )}
+
+              {error && (
+                <View style={[styles.errorContainer, { backgroundColor: colors.error + '10', borderColor: colors.error }]}>
+                  <Text style={[styles.errorTitle, { color: colors.error }]}>Error</Text>
+                  <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
+                  <Text style={[styles.errorHint, { color: colors.textSecondary }]}>
+                    Check console for details
+                  </Text>
                 </View>
               )}
             </ScrollView>
@@ -408,5 +434,25 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  errorContainer: {
+    margin: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  errorTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  errorHint: {
+    fontSize: 12,
+    fontStyle: 'italic',
   },
 });

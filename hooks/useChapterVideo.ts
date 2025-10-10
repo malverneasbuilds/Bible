@@ -49,21 +49,27 @@ export function useChapterVideo(bookNumber: number, chapter: number) {
     setError(null);
 
     try {
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/generate-chapter-video`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            bookNumber,
-            chapter,
-          }),
-        }
-      );
+      if (!supabaseUrl) {
+        throw new Error('Supabase URL not configured');
+      }
 
+      const url = `${supabaseUrl}/functions/v1/generate-chapter-video`;
+      console.log('Generating video:', { url, bookNumber, chapter });
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bookNumber,
+          chapter,
+        }),
+      });
+
+      console.log('Video generation response status:', response.status);
       const data = await response.json();
+      console.log('Video generation response data:', data);
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to generate video');
@@ -71,8 +77,10 @@ export function useChapterVideo(bookNumber: number, chapter: number) {
 
       if (data.cached) {
         setVideo(data.video);
+        console.log('Video loaded from cache');
       } else {
         setVideo(data.video);
+        console.log('Video generation started, status:', data.video.status);
 
         if (data.video.status === 'generating') {
           startPolling();
@@ -81,7 +89,8 @@ export function useChapterVideo(bookNumber: number, chapter: number) {
 
       return data.video;
     } catch (err: any) {
-      setError(err.message);
+      const errorMsg = err.message || 'Failed to generate video';
+      setError(errorMsg);
       console.error('Error generating video:', err);
       return null;
     } finally {
