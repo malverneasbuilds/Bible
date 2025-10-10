@@ -131,40 +131,19 @@ Generate a cinematic video prompt (max 500 characters) that captures the essence
     const scriptData = await scriptResponse.json();
     const script = scriptData.choices[0].message.content;
 
-    const veoApiKey = Deno.env.get('VEO_API_KEY');
-    if (!veoApiKey) {
-      throw new Error('Veo API key not configured');
-    }
-
-    const veoResponse = await fetch('https://api.veo.video/v1/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${veoApiKey}`,
-      },
-      body: JSON.stringify({
-        prompt: script,
-        duration: 10,
-        aspect_ratio: '16:9',
-        style: 'cinematic',
-      }),
-    });
-
-    if (!veoResponse.ok) {
-      const errorText = await veoResponse.text();
-      throw new Error(`Veo API error: ${errorText}`);
-    }
-
-    const veoData = await veoResponse.json();
+    // NOTE: Google's Veo video generation API is not yet publicly available.
+    // When it becomes available, it will be accessed through Google Cloud's Vertex AI.
+    // For now, we'll save the script and mark the video as failed with a helpful message.
 
     const videoRecord = {
       book_number: bookNumber,
       chapter: chapter,
       script: script,
-      status: veoData.status === 'completed' ? 'completed' : 'generating',
-      veo_task_id: veoData.task_id || veoData.id,
-      video_url: veoData.video_url || null,
-      duration_seconds: veoData.duration || 10,
+      status: 'failed' as const,
+      veo_task_id: null,
+      video_url: null,
+      duration_seconds: 10,
+      error_message: 'Video generation is not yet available. Google Veo API access is required. The AI-generated script has been saved for when video generation becomes available.',
     };
 
     const { data: savedVideo, error: saveError } = await supabase
@@ -183,8 +162,10 @@ Generate a cinematic video prompt (max 500 characters) that captures the essence
       JSON.stringify({
         success: true,
         video: savedVideo,
-        message: savedVideo.status === 'completed' 
+        message: savedVideo.status === 'completed'
           ? 'Video generated successfully!'
+          : savedVideo.status === 'failed'
+          ? 'Video generation is currently unavailable. AI script generated successfully.'
           : 'Video generation started. This may take 2-3 minutes.',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

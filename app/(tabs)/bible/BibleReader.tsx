@@ -220,6 +220,7 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
         chapterTitle={`${book.name} ${chapter}`}
         isGenerating={video?.status === 'generating'}
         error={videoError || video?.error_message}
+        script={video?.script}
         onClose={() => setShowVideoPlayer(false)}
       />
     </>

@@ -19,6 +19,7 @@ interface VideoPlayerModalProps {
   chapterTitle: string;
   isGenerating: boolean;
   error?: string | null;
+  script?: string | null;
   onClose: () => void;
 }
 
@@ -28,6 +29,7 @@ export function VideoPlayerModal({
   chapterTitle,
   isGenerating,
   error,
+  script,
   onClose,
 }: VideoPlayerModalProps) {
   const { colors } = useTheme();
@@ -60,11 +62,14 @@ export function VideoPlayerModal({
           <View style={styles.content}>
             {error ? (
               <View style={styles.errorContainer}>
-                <Text style={[styles.errorTitle, { color: colors.error }]}>Error</Text>
+                <Text style={[styles.errorTitle, { color: colors.error }]}>Video Not Available</Text>
                 <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
-                <Text style={[styles.errorHint, { color: colors.textSecondary }]}>
-                  Check console for more details
-                </Text>
+                {script && (
+                  <>
+                    <Text style={[styles.scriptTitle, { color: colors.text }]}>Generated Script:</Text>
+                    <Text style={[styles.scriptText, { color: colors.textSecondary }]}>{script}</Text>
+                  </>
+                )}
               </View>
             ) : isGenerating || !videoUrl ? (
               <View style={styles.generatingContainer}>
@@ -239,6 +244,18 @@ const styles = StyleSheet.create({
   errorHint: {
     fontSize: 14,
     textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  scriptTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  scriptText: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'left',
     fontStyle: 'italic',
   },
 });
