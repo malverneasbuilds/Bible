@@ -2,8 +2,8 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
+  'Access-Control-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
 Deno.serve(async (req: Request) => {
@@ -14,6 +14,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const googleApiKey = Deno.env.get('GOOGLE_API_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const url = new URL(req.url);
@@ -31,79 +32,108 @@ Deno.serve(async (req: Request) => {
       .eq('chapter', chapter)
       .maybeSingle();
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
+    const { GoogleGenAI } = await import('npm:@google/generative-ai@0.21.0');
+    const ai = new GoogleGenAI({ apiKey: googleApiKey });
+
+    // If video doesn't exist, start generation
     if (!video) {
+      const prompt = `A cinematic scene illustrating ${bookNumber} chapter ${chapter} from the Bible. 
+      Keep the visuals historically accurate and reverent.`;
+
+      console.log("Starting Veo video generation...");
+      let operation = await ai.models.generateVideos({
+        model: "veo-3.0-generate-001",
+        prompt,
+      });
+
+      // Save initial record with status “generating”
+      const { data: newVideo, error: insertError } = await supabase
+        .from('chapter_videos')
+        .insert({
+          book_number: bookNumber,
+          chapter,
+          status: 'generating',
+          veo_task_id: operation.name, // important!
+        })
+        .select()
+        .maybeSingle();
+
+      if (insertError) throw insertError;
+
       return new Response(
         JSON.stringify({
           success: true,
-          status: 'not_found',
-          message: 'No video found for this chapter',
+          status: 'started',
+          message: 'Video generation started',
+          veo_task_id: operation.name,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    // If already generating, poll for completion
     if (video.status === 'generating' && video.veo_task_id) {
-      const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
-      console.log('Here is the code to test')
-      if (googleApiKey) {
-       console.log('Now generating the video')
-        try {
-          const { GoogleGenAI } = await import('npm:@google/generative-ai@0.21.0');
-          const ai = new GoogleGenAI({ apiKey: googleApiKey });
+      console.log('Checking Veo operation status...');
+      let operation = await ai.operations.getVideosOperation({
+        operation: { name: video.veo_task_id },
+      });
 
-          // Check operation status
-          const operation = await ai.operations.getVideosOperation({
-            operation: { name: video.veo_task_id },
-          });
+      if (!operation.done) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            status: 'in_progress',
+            message: 'Video still generating',
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-          if (operation.done) {
-            if (operation.response?.generatedVideos?.[0]?.video) {
-              // Video is ready, get the file URL
-              const videoFile = operation.response.generatedVideos[0].video;
+      // When done, check result
+      if (operation.response?.generatedVideos?.[0]?.video) {
+        const videoFile = operation.response.generatedVideos[0].video;
 
-              // Note: In production, you would download this file and upload to your own storage
-              // For now, we'll store the file reference
-              const { error: updateError } = await supabase
-                .from('chapter_videos')
-                .update({
-                  status: 'completed',
-                  video_url: videoFile.uri || null,
-                  duration_seconds: 10,
-                })
-                .eq('id', video.id);
+        const { error: updateError } = await supabase
+          .from('chapter_videos')
+          .update({
+            status: 'completed',
+            video_url: videoFile.uri,
+            duration_seconds: 10,
+          })
+          .eq('id', video.id);
 
-              if (!updateError) {
-                video.status = 'completed';
-                video.video_url = videoFile.uri;
-                video.duration_seconds = 10;
-              }
-            } else if (operation.error) {
-              await supabase
-                .from('chapter_videos')
-                .update({
-                  status: 'failed',
-                  error_message: operation.error.message || 'Video generation failed',
-                })
-                .eq('id', video.id);
+        if (updateError) throw updateError;
 
-              video.status = 'failed';
-              video.error_message = operation.error.message || 'Video generation failed';
-            }
-          }
-        } catch (veoError) {
-          console.error('Error checking Veo status:', veoError);
-        }
+        return new Response(
+          JSON.stringify({
+            success: true,
+            status: 'completed',
+            video_url: videoFile.uri,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (operation.error) {
+        await supabase
+          .from('chapter_videos')
+          .update({
+            status: 'failed',
+            error_message: operation.error.message,
+          })
+          .eq('id', video.id);
+
+        throw new Error(operation.error.message);
       }
     }
 
+    // If video exists and completed
     return new Response(
       JSON.stringify({
         success: true,
-        video: video,
+        video,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
