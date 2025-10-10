@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { MessageCircle, Share, Heart } from 'lucide-react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { MessageCircle, Heart } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useBible } from '@/hooks/useBible';
 import { useTheme } from '@/hooks/useTheme';
@@ -8,13 +8,25 @@ import { AIChatModal } from '@/components/AIChatModal';
 
 export function VerseOfTheDay() {
   const { colors } = useTheme();
-  const { getVerseOfTheDay, saveVerse } = useBible();
+  const { getVerseOfTheDay, saveVerse, isVerseSaved } = useBible();
   const [showAIChat, setShowAIChat] = useState(false);
-  
+  const [isSaved, setIsSaved] = useState(false);
+
   const verseOfTheDay = getVerseOfTheDay();
 
+  useEffect(() => {
+    const saved = isVerseSaved(verseOfTheDay);
+    setIsSaved(saved);
+  }, [verseOfTheDay.id]);
+
   const handleSaveVerse = async () => {
+    if (isSaved) {
+      Alert.alert('Already Saved', 'This verse is already in your saved verses.');
+      return;
+    }
     await saveVerse(verseOfTheDay);
+    setIsSaved(true);
+    Alert.alert('Saved!', 'Verse added to your saved verses.');
   };
 
   return (
@@ -44,9 +56,19 @@ export function VerseOfTheDay() {
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={[
+                styles.iconButton,
+                {
+                  backgroundColor: isSaved ? colors.primary + '15' : colors.card,
+                  borderColor: isSaved ? colors.primary : colors.border,
+                }
+              ]}
               onPress={handleSaveVerse}>
-              <Heart size={18} color={colors.textSecondary} />
+              <Heart
+                size={18}
+                color={isSaved ? colors.primary : colors.textSecondary}
+                fill={isSaved ? colors.primary : 'none'}
+              />
             </TouchableOpacity>
           </View>
         </LinearGradient>

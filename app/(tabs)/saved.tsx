@@ -2,20 +2,63 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Heart, Highlighter, MessageCircle } from 'lucide-react-native';
 import { useBible } from '@/hooks/useBible';
-import { useAI } from '@/hooks/useAI';
 import { useTheme } from '@/hooks/useTheme';
+import { AIChatModal } from '@/components/AIChatModal';
+import { supabase } from '@/lib/supabase';
+import { ChatMessage } from '@/types/bible';
 
 type SavedScreenTab = 'saved' | 'highlighted' | 'chats';
+
+interface SavedChat {
+  id: string;
+  title: string;
+  verse_reference: string | null;
+  verse_text: string | null;
+  messages: any;
+  created_at: string;
+  updated_at: string;
+}
 
 export default function SavedScreen() {
   const { colors } = useTheme();
   const { savedVerses, highlightedVerses } = useBible();
-  const { savedChats, loadSavedChats } = useAI();
+  const [savedChats, setSavedChats] = useState<SavedChat[]>([]);
   const [activeTab, setActiveTab] = useState<SavedScreenTab>('saved');
+  const [selectedChat, setSelectedChat] = useState<SavedChat | null>(null);
+  const [showChatModal, setShowChatModal] = useState(false);
+
+  const loadSavedChats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('ai_chats')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading chats:', error);
+        return;
+      }
+
+      setSavedChats(data || []);
+    } catch (err) {
+      console.error('Error loading saved chats:', err);
+    }
+  };
 
   useEffect(() => {
     loadSavedChats();
   }, []);
+
+  const handleChatClick = (chat: SavedChat) => {
+    setSelectedChat(chat);
+    setShowChatModal(true);
+  };
+
+  const handleChatClose = () => {
+    setShowChatModal(false);
+    setSelectedChat(null);
+    loadSavedChats();
+  };
 
   const tabs = [
     { id: 'saved' as const, label: 'Saved', icon: Heart, count: savedVerses.length },
@@ -48,28 +91,32 @@ export default function SavedScreen() {
     </View>
   );
 
-  const renderChatItem = (chat: any, index: number) => (
-    <View
-      key={`${chat.id}-${index}`}
-      style={[styles.chatItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={styles.chatHeader}>
-        <Text style={[styles.chatTitle, { color: colors.text }]}>
-          {chat.title}
+  const renderChatItem = (chat: SavedChat, index: number) => {
+    const messages = Array.isArray(chat.messages) ? chat.messages : [];
+    return (
+      <TouchableOpacity
+        key={`${chat.id}-${index}`}
+        style={[styles.chatItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+        onPress={() => handleChatClick(chat)}>
+        <View style={styles.chatHeader}>
+          <Text style={[styles.chatTitle, { color: colors.text }]} numberOfLines={1}>
+            {chat.title}
+          </Text>
+          <Text style={[styles.chatDate, { color: colors.textSecondary }]}>
+            {new Date(chat.created_at).toLocaleDateString()}
+          </Text>
+        </View>
+        {chat.verse_reference && (
+          <Text style={[styles.chatVerse, { color: colors.primary }]}>
+            {chat.verse_reference}
+          </Text>
+        )}
+        <Text style={[styles.chatPreview, { color: colors.textSecondary }]}>
+          {messages.length} messages
         </Text>
-        <Text style={[styles.chatDate, { color: colors.textSecondary }]}>
-          {new Date(chat.savedAt).toLocaleDateString()}
-        </Text>
-      </View>
-      {chat.verse && (
-        <Text style={[styles.chatVerse, { color: colors.primary }]}>
-          {chat.verse.book.charAt(0).toUpperCase() + chat.verse.book.slice(1)} {chat.verse.chapter}:{chat.verse.verse}
-        </Text>
-      )}
-      <Text style={[styles.chatPreview, { color: colors.textSecondary }]}>
-        {chat.messages.length} messages
-      </Text>
-    </View>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -123,8 +170,18 @@ export default function SavedScreen() {
     }
   };
 
+  const convertChatMessages = (messages: any[]): ChatMessage[] => {
+    return messages.map((msg, index) => ({
+      id: `${Date.now()}-${index}`,
+      text: msg.content,
+      isUser: msg.role === 'user',
+      timestamp: new Date().toISOString(),
+    }));
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.surface }]}>
         <Text style={[styles.title, { color: colors.text }]}>Saved Content</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -160,10 +217,24 @@ export default function SavedScreen() {
         ))}
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-        {renderContent()}
-      </ScrollView>
-    </View>
+        <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+          {renderContent()}
+        </ScrollView>
+      </View>
+
+      {selectedChat && (
+        <AIChatModal
+          visible={showChatModal}
+          chatId={selectedChat.id}
+          existingMessages={convertChatMessages(selectedChat.messages || [])}
+          onClose={handleChatClose}
+          onChatSaved={(chatId) => {
+            console.log('Chat saved:', chatId);
+            loadSavedChats();
+          }}
+        />
+      )}
+    </>
   );
 }
 
