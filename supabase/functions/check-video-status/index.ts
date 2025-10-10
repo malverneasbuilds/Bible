@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { GoogleGenAI } from 'npm:@google/generative-ai@0.21.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -47,47 +48,48 @@ Deno.serve(async (req: Request) => {
     }
 
     if (video.status === 'generating' && video.veo_task_id) {
-      const veoApiKey = Deno.env.get('VEO_API_KEY');
-      if (veoApiKey) {
+      const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
+      if (googleApiKey) {
         try {
-          const veoStatusResponse = await fetch(
-            `https://api.veo.video/v1/tasks/${video.veo_task_id}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${veoApiKey}`,
-              },
-            }
-          );
+          const ai = new GoogleGenAI({ apiKey: googleApiKey });
 
-          if (veoStatusResponse.ok) {
-            const veoStatus = await veoStatusResponse.json();
-            
-            if (veoStatus.status === 'completed' && veoStatus.video_url) {
+          // Check operation status
+          const operation = await ai.operations.getVideosOperation({
+            operation: { name: video.veo_task_id },
+          });
+
+          if (operation.done) {
+            if (operation.response?.generatedVideos?.[0]?.video) {
+              // Video is ready, get the file URL
+              const videoFile = operation.response.generatedVideos[0].video;
+
+              // Note: In production, you would download this file and upload to your own storage
+              // For now, we'll store the file reference
               const { error: updateError } = await supabase
                 .from('chapter_videos')
                 .update({
                   status: 'completed',
-                  video_url: veoStatus.video_url,
-                  duration_seconds: veoStatus.duration || video.duration_seconds,
+                  video_url: videoFile.uri || null,
+                  duration_seconds: 10,
                 })
                 .eq('id', video.id);
 
               if (!updateError) {
                 video.status = 'completed';
-                video.video_url = veoStatus.video_url;
-                video.duration_seconds = veoStatus.duration || video.duration_seconds;
+                video.video_url = videoFile.uri;
+                video.duration_seconds = 10;
               }
-            } else if (veoStatus.status === 'failed') {
+            } else if (operation.error) {
               await supabase
                 .from('chapter_videos')
                 .update({
                   status: 'failed',
-                  error_message: veoStatus.error || 'Video generation failed',
+                  error_message: operation.error.message || 'Video generation failed',
                 })
                 .eq('id', video.id);
 
               video.status = 'failed';
-              video.error_message = veoStatus.error || 'Video generation failed';
+              video.error_message = operation.error.message || 'Video generation failed';
             }
           }
         } catch (veoError) {

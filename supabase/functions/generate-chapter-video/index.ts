@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { GoogleGenAI } from 'npm:@google/generative-ai@0.21.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -131,19 +132,31 @@ Generate a cinematic video prompt (max 500 characters) that captures the essence
     const scriptData = await scriptResponse.json();
     const script = scriptData.choices[0].message.content;
 
-    // NOTE: Google's Veo video generation API is not yet publicly available.
-    // When it becomes available, it will be accessed through Google Cloud's Vertex AI.
-    // For now, we'll save the script and mark the video as failed with a helpful message.
+    // Initialize Google GenAI with API key
+    const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
+    if (!googleApiKey) {
+      throw new Error('Google API key not configured');
+    }
 
+    const ai = new GoogleGenAI({ apiKey: googleApiKey });
+
+    // Start video generation
+    let operation = await ai.models.generateVideos({
+      model: 'veo-3.0-generate-001',
+      prompt: script,
+    });
+
+    // Since video generation takes time, we'll save the operation ID
+    // and mark it as 'generating'. A separate function will poll for completion.
     const videoRecord = {
       book_number: bookNumber,
       chapter: chapter,
       script: script,
-      status: 'failed' as const,
-      veo_task_id: null,
+      status: 'generating' as const,
+      veo_task_id: operation.name,
       video_url: null,
       duration_seconds: 10,
-      error_message: 'Video generation is not yet available. Google Veo API access is required. The AI-generated script has been saved for when video generation becomes available.',
+      error_message: null,
     };
 
     const { data: savedVideo, error: saveError } = await supabase
