@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { ChevronLeft, ChevronDown, Volume2, Search } from 'lucide-react-native';
+import { ChevronLeft, ChevronDown, Volume2, Search, Video } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useBible } from '@/hooks/useBible';
 import { useTheme } from '@/hooks/useTheme';
+import { useChapterVideo } from '@/hooks/useChapterVideo';
 import { Verse } from '@/types/bible';
 import { VerseActions } from './components/VerseActions';
 import { AIChatModal } from '@/components/AIChatModal';
@@ -11,6 +12,7 @@ import { BookSelectionModal } from '@/components/BookSelectionModal';
 import { ChapterSelectionModal } from '@/components/ChapterSelectionModal';
 import { SearchModal } from '@/components/SearchModal';
 import { AudioPlayerControls } from '@/components/AudioPlayerControls';
+import { VideoPlayerModal } from '@/components/VideoPlayerModal';
 
 interface BibleReaderProps {
   bookId: string;
@@ -31,8 +33,11 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
   const [showChapterSelection, setShowChapterSelection] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showAudioPlayer, setShowAudioPlayer] = useState(false);
+  const [showVideoPlayer, setShowVideoPlayer] = useState(false);
 
   const book = books.find(b => b.id === bookId);
+  const bookNumber = book ? books.indexOf(book) + 1 : 0;
+  const { video, isLoading: videoLoading, generateVideo } = useChapterVideo(bookNumber, chapter);
 
   useEffect(() => {
     const loadChapter = async () => {
@@ -82,6 +87,17 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
     setTimeout(() => setSelectedVerse(null), 3000);
   };
 
+  const handleWatchStory = async () => {
+    if (video?.status === 'completed' && video?.video_url) {
+      setShowVideoPlayer(true);
+    } else if (!video || video.status === 'failed') {
+      await generateVideo();
+      setShowVideoPlayer(true);
+    } else if (video.status === 'generating') {
+      setShowVideoPlayer(true);
+    }
+  };
+
   if (!book) return null;
 
   return (
@@ -116,6 +132,12 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
             style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => setShowSearch(true)}>
             <Search size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={handleWatchStory}
+            disabled={videoLoading}>
+            <Video size={20} color={video?.status === 'completed' ? colors.success : colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.primary }]}
@@ -196,6 +218,14 @@ export function BibleReader({ bookId, chapter, onBack, onBookChange, onChapterCh
         onClose={() => setShowAudioPlayer(false)}
         text={verses.map(v => v.text).join(' ')}
         title={`${book.name} ${chapter}`}
+      />
+
+      <VideoPlayerModal
+        visible={showVideoPlayer}
+        videoUrl={video?.video_url || null}
+        chapterTitle={`${book.name} ${chapter}`}
+        isGenerating={video?.status === 'generating'}
+        onClose={() => setShowVideoPlayer(false)}
       />
     </>
   );
