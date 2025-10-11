@@ -164,7 +164,7 @@ Generate a cinematic video prompt (max 500 characters) that captures the essence
       try {
         // Dynamically import the Google GenAI package
         console.log('📦 Importing Google GenAI package...');
-        const { GoogleGenAI } = await import('npm:@google/generative-ai@0.21.0');
+        const { GoogleGenAI } = await import('npm:@google/genai');
         console.log('✅ Package imported, initializing AI...');
         const ai = new GoogleGenAI({ apiKey: googleApiKey });
         console.log('✅ AI initialized');
